@@ -440,7 +440,9 @@ if True:
         cdf['SIPP2'] = df['sipp_uf_2'] + df['sipp_df_2']
     else:
         cdf['SIPP '] = df['sipp_uf_1'] + df['sipp_df_1']
-    cdf['ISA'] = df['isa']
+cdf['ISA'] = df['isa']
+
+if 'gia' in df.columns:
     cdf['GIA'] = df['gia']
 
     # https://altair-viz.github.io/user_guide/data.html#converting-with-pandas
