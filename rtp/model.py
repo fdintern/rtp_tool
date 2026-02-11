@@ -8,7 +8,7 @@
 #   - Oversized SIPP detection and strategy adjustment
 #
 # Copyright (c) 2023 LateGenXer (original)
-# Enhancements for Fowler Drew by Claude/Anthropic
+# Enhancements by Claude/Anthropic
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
