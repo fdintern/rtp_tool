@@ -373,7 +373,8 @@ s = df.style
 s.hide(axis='index')
 
 s.format(float_format)
-s.format(formatters, subset=list(formatters.keys()))
+existing_cols = [col for col in formatters.keys() if col in s.data.columns]
+s.format({k: v for k, v in formatters.items() if k in existing_cols}, subset=existing_cols)
 
 s.relabel_index(list(column_headers.values()), axis='columns')
 
