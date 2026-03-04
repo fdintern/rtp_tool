@@ -42,10 +42,16 @@ default_state = {
     "state_pension_years_2": 35,
     "marginal_income_tax_1": 0.4,
     "marginal_income_tax_2": 0.2,
-    "sipp_1": 750000,
-    "sipp_2": 000000,
-    "sipp_df_1": 0,
-    "sipp_df_2": 0,
+    # SIPP uncrystallised — equity and ILG split
+    "sipp_1_eq": 750000,
+    "sipp_1_ilg": 0,
+    "sipp_2_eq": 0,
+    "sipp_2_ilg": 0,
+    # SIPP drawdown — equity and ILG split
+    "sipp_df_1_eq": 0,
+    "sipp_df_1_ilg": 0,
+    "sipp_df_2_eq": 0,
+    "sipp_df_2_ilg": 0,
     "sipp_contrib_1": 0,
     "sipp_contrib_2": uiaa,
     "sipp_extra_contrib": False,
@@ -55,14 +61,22 @@ default_state = {
     "db_ages_2": "",
     "lsa_ratio_1": 100.0,
     "lsa_ratio_2": 100.0,
-    "isa": 250000,
-    "gia": 0,
+    # ISA — equity and ILG split
+    "isa_eq": 250000,
+    "isa_ilg": 0,
+    # GIA — equity and ILG split
+    "gia_eq": 0,
+    "gia_ilg": 0,
     "misc_contrib": 0,
     "inflation_rate": 2.5,
     "isa_growth_rate": 5.5,
+    "isa_ilg_growth_rate_real": 0.0,
     "gia_growth_rate": 5.5,
+    "gia_ilg_growth_rate": 2.5,
     "sipp_growth_rate_1": 5.5,
     "sipp_growth_rate_2": 5.5,
+    "sipp_ilg_growth_rate_real_1": 0.0,
+    "sipp_ilg_growth_rate_real_2": 0.0,
     "retirement_country": "UK",
     "retirement_income_net": 0,
     "retirement_year": 2045,
@@ -74,7 +88,7 @@ default_state = {
 }
 
 
-def load_state(data:bytes, override:bool) -> None:
+def load_state(data: bytes, override: bool) -> None:
     state = json.loads(data)
     uploaded_version = state.pop('version', 0)
     if uploaded_version != version:
@@ -89,7 +103,7 @@ def load_state(data:bytes, override:bool) -> None:
             st.warning(f"Unexpected parameter {key}={value!r}", icon="⚠️")
 
 
-# Allow to override initial state on development enviroments
+# Allow to override initial state on development environments
 
 devel = False
 if "PYTEST_CURRENT_TEST" not in os.environ:
@@ -134,7 +148,6 @@ with st.expander("Upload..."):
     uploaded_file = st.file_uploader("Upload parameters", type=['json'], help='Upload all parameters from JSON file.', label_visibility='collapsed')
     if uploaded_file is not None:
         data = uploaded_file.getvalue()
-        # Avoid reprocessing the uploaded file on re-runs
         data_hash = hash(data)
         if data_hash not in st.session_state.uploaded_hashes:
             st.session_state.uploaded_hashes.add(data_hash)
@@ -154,22 +167,21 @@ with st.form(key='form'):
 
         marginal_income_tax_help = "Used to estimate income tax from withdrawing more than the Tax Free Cash from a pension before retirement."
 
-        sipp_help = """_Uncrystalized_ funds held in Defined Contribution Pension schemes.
+        sipp_eq_help = """_Equity_ portion of uncrystallised funds held in Defined Contribution Pension schemes."""
+        sipp_ilg_help = """_Index-Linked Gilt_ portion of uncrystallised funds held in Defined Contribution Pension schemes."""
 
-If pension funds have been accessed as tax-free-allowance or moved into flexi-access drawdown then the appropriate fields in the _Post-retirement_ tab should be filled in.
-"""
-
-        db_payments_help = """Yearly payment made by Defined Benefit pension schemes(s).  Payments from multiple pension schemes can be entered seperated by semi-colons (;).
+        db_payments_help = """Yearly payment made by Defined Benefit pension schemes(s).  Payments from multiple pension schemes can be entered separated by semi-colons (;).
 
 Payments are assumed to increase in line with inflation.
 """
-        db_ages_help = "Age(s) the DB pension scheme(s) start paying.  Ages of multiple pension schemes can be entered seperated by semi-colons (;)."
+        db_ages_help = "Age(s) the DB pension scheme(s) start paying.  Ages of multiple pension schemes can be entered separated by semi-colons (;)."
 
         with col1:
             st.subheader('You')
             st.number_input('Year of birth:', min_value=1920, max_value=2080, step=1, key='dob_1')
             st.number_input('State pension qualifying years at retirement:', min_value=0, max_value=35, step=1, key='state_pension_years_1', help=state_pension_years_help)
-            st.number_input('DC pensions value:', min_value=0, step=1, key='sipp_1', help=sipp_help)
+            st.number_input('DC pensions value (Equity):', min_value=0, step=1, key='sipp_1_eq', help=sipp_eq_help)
+            st.number_input('DC pensions value (ILG):', min_value=0, step=1, key='sipp_1_ilg', help=sipp_ilg_help)
             st.number_input('DC pensions yearly _gross_ contribution:', min_value=0, max_value=aa, step=1, key='sipp_contrib_1', help="Until retirement")
             st.text_input('DB pension yearly benefit(s):', key='db_payments_1', help=db_payments_help)
             st.text_input('DB pension age(s):', key='db_ages_1', help=db_ages_help)
@@ -180,7 +192,8 @@ Payments are assumed to increase in line with inflation.
             st.subheader('Partner')
             st.number_input('Year of birth:', min_value=1920, max_value=2080, step=1, key='dob_2', disabled=single)
             st.number_input('State pension qualifying years at retirement:', min_value=0, max_value=35, step=1, key='state_pension_years_2', disabled=single, help=state_pension_years_help)
-            st.number_input('DC pensions value:', min_value=0, step=1, key='sipp_2', help=sipp_help, disabled=single)
+            st.number_input('DC pensions value (Equity):', min_value=0, step=1, key='sipp_2_eq', help=sipp_eq_help, disabled=single)
+            st.number_input('DC pensions value (ILG):', min_value=0, step=1, key='sipp_2_ilg', help=sipp_ilg_help, disabled=single)
             st.number_input('DC pensions yearly _gross_ contribution:', min_value=0, max_value=aa, step=1, key='sipp_contrib_2', help="Until retirement", disabled=single)
             st.text_input('DB pension yearly benefit(s):', key='db_payments_2', help=db_payments_help)
             st.text_input('DB pension age(s):', key='db_ages_2', help=db_ages_help)
@@ -190,8 +203,10 @@ Payments are assumed to increase in line with inflation.
             st.subheader('Shared')
             st.number_input('Retirement year:', min_value=2020, max_value=2080, step=1, key='retirement_year')
             st.number_input('Retirement income (0 for maximum):', min_value=0, step=1000, key='retirement_income_net', help='Go to https://www.retirementlivingstandards.org.uk/ for guidance.')
-            st.number_input('ISAs value:', min_value=0, step=1, key='isa')
-            st.number_input('GIAs value:', min_value=0, step=1, key='gia')
+            st.number_input('ISAs value (Equity):', min_value=0, step=1, key='isa_eq')
+            st.number_input('ISAs value (ILG):', min_value=0, step=1, key='isa_ilg')
+            st.number_input('GIAs value (Equity):', min_value=0, step=1, key='gia_eq')
+            st.number_input('GIAs value (ILG):', min_value=0, step=1, key='gia_ilg')
             st.number_input('ISAs/GIAs yearly savings:', min_value=0, step=1, key='misc_contrib', help="Until retirement.  The optimization will automatically maximize the ISA allowance.")
 
     # Advanced
@@ -202,16 +217,24 @@ Payments are assumed to increase in line with inflation.
             max_rate = 10.0
             growth_rate_format = '%.1f%%'
             st.slider("Inflation rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="inflation_rate")
-            st.slider("Your SIPP nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="sipp_growth_rate_1")
-            st.slider("Partner's SIPP nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="sipp_growth_rate_2")
-            st.slider("ISAs nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="isa_growth_rate")
-            st.slider("GIAs nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="gia_growth_rate")
+            st.slider("Your SIPP equity nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="sipp_growth_rate_1")
+            st.slider("Your SIPP ILG real growth rate:", min_value=0.0, max_value=max_rate, step=0.1, format=growth_rate_format, key="sipp_ilg_growth_rate_real_1",
+                help="Real (after-inflation) growth rate for the ILG sleeve of your SIPP. Typically 0% for standard ILGs.")
+            st.slider("Partner's SIPP equity nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="sipp_growth_rate_2")
+            st.slider("Partner's SIPP ILG real growth rate:", min_value=0.0, max_value=max_rate, step=0.1, format=growth_rate_format, key="sipp_ilg_growth_rate_real_2",
+                help="Real (after-inflation) growth rate for the ILG sleeve of your partner's SIPP. Typically 0% for standard ILGs.")
+            st.slider("ISAs equity nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="isa_growth_rate")
+            st.slider("ISAs ILG real growth rate:", min_value=0.0, max_value=max_rate, step=0.1, format=growth_rate_format, key="isa_ilg_growth_rate_real",
+                help="Real (after-inflation) growth rate for the ILG sleeve of your ISAs. Typically 0% for standard ILGs.")
+            st.slider("GIAs equity nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="gia_growth_rate")
+            st.slider("GIAs ILG nominal growth rate:", min_value=0.0, max_value=max_rate, step=0.5, format=growth_rate_format, key="gia_ilg_growth_rate",
+                help="Nominal growth rate for the ILG sleeve of your GIA (used for CGT cost-basis calculation).")
 
         with col2:
             st.checkbox("Marriage Allowance", key="marriage_allowance", disabled=single, help='\n'.join([
                 "Transfer the Marriage Allowance from your partner to you.",
                 "",
-                "This will enforce the [applicable rules](https://www.gov.uk/marriage-allowance#who-can-apply) and might end up constraining the retirement income to ensure income stays withing basic rate.",
+                "This will enforce the [applicable rules](https://www.gov.uk/marriage-allowance#who-can-apply) and might end up constraining the retirement income to ensure income stays within basic rate.",
             ]))
 
         with col3:
@@ -225,21 +248,23 @@ Payments are assumed to increase in line with inflation.
     with tab3:
         col1, col2, col3 = st.columns(3)
 
-        lsa_ratio_help = '''Percentage of the Lump Sump Allowance left.
+        lsa_ratio_help = '''Percentage of the Lump Sum Allowance left.
 
 This is equivalent to the old Lifetime Allowance percentage.
 '''
-        sipp_df_help = '''Pension funds hold in flex-acces drawdown.'''
+        sipp_df_help = '''Pension funds held in flexi-access drawdown.'''
 
         with col1:
             st.subheader('You')
-            st.number_input('Lum Sump Allowance (%):', min_value=0, max_value=100, step=1, key='lsa_ratio_1')
-            st.number_input('DC pension flexi-access drawdown funds:', min_value=0, step=1, key='sipp_df_1', help=sipp_df_help)
+            st.number_input('Lump Sum Allowance (%):', min_value=0, max_value=100, step=1, key='lsa_ratio_1')
+            st.number_input('DC pension flexi-access drawdown funds (Equity):', min_value=0, step=1, key='sipp_df_1_eq', help=sipp_df_help)
+            st.number_input('DC pension flexi-access drawdown funds (ILG):', min_value=0, step=1, key='sipp_df_1_ilg', help=sipp_df_help)
 
         with col2:
             st.subheader('Partner')
-            st.number_input('Lum Sump Allowance (%):', min_value=0, max_value=100, step=1, key='lsa_ratio_2', disabled=single)
-            st.number_input('DC pensions flexi-access drawdown funds:', min_value=0, step=1, key='sipp_df_2', disabled=single)
+            st.number_input('Lump Sum Allowance (%):', min_value=0, max_value=100, step=1, key='lsa_ratio_2', disabled=single)
+            st.number_input('DC pensions flexi-access drawdown funds (Equity):', min_value=0, step=1, key='sipp_df_2_eq', disabled=single, help=sipp_df_help)
+            st.number_input('DC pensions flexi-access drawdown funds (ILG):', min_value=0, step=1, key='sipp_df_2_ilg', disabled=single, help=sipp_df_help)
 
         with col3:
             st.subheader('Shared')
@@ -255,7 +280,7 @@ This is equivalent to the old Lifetime Allowance percentage.
                 "Allow additional SIPP contributions funded by unearned income, on top of regular contributions.",
                 "",
                 "Care is taken to follow the [pension tax-free cash recycling rules](https://www.gov.uk/hmrc-internal-manuals/pensions-tax-manual/ptm133800) by limiting total contributions to 130% of the regular contributions.",
-                "This is not necessarily optimal, but is easy to model and it should be resonably safe.",
+                "This is not necessarily optimal, but is easy to model and it should be reasonably safe.",
                 "",
                 "Still contributions should be checked with utmost care and advice taken before following such plan.",
             ]))
@@ -288,7 +313,7 @@ st.header('Results')
 params = {key: value for key, value in st.session_state.items() if key in default_state}
 
 def perc_xform(x):
-    return x*.01
+    return x * .01
 
 def number_list_xform(s):
     if s:
@@ -296,12 +321,16 @@ def number_list_xform(s):
     else:
         return []
 
-state_xforms =  {
+state_xforms = {
     'inflation_rate': perc_xform,
     'sipp_growth_rate_1': perc_xform,
     'sipp_growth_rate_2': perc_xform,
+    'sipp_ilg_growth_rate_real_1': perc_xform,
+    'sipp_ilg_growth_rate_real_2': perc_xform,
     'isa_growth_rate': perc_xform,
+    'isa_ilg_growth_rate_real': perc_xform,
     'gia_growth_rate': perc_xform,
+    'gia_ilg_growth_rate': perc_xform,
     'lsa_ratio_1': perc_xform,
     'lsa_ratio_2': perc_xform,
     'db_payments_1': number_list_xform,
@@ -394,14 +423,9 @@ s.highlight_between(subset=['year'], left=st.session_state.retirement_year, prop
 
 # Additional bells & whistles
 if True:
-    # https://pandas.pydata.org/docs/user_guide/style.html#Background-Gradient-and-Text-Gradient
-    # https://matplotlib.org/stable/tutorials/colors/colormaps.html
     s.background_gradient(cmap='Wistia', text_color_threshold=0, subset=['income_gross_1', 'income_gross_2'], vmin=0, vmax=100000)
     s.background_gradient(cmap='Oranges', subset=['income_tax_rate_1', 'income_tax_rate_2', 'cgt_rate'], vmin=0, vmax=1)
     s.background_gradient(cmap='magma', subset=['lsa_ratio_1', 'lsa_ratio_2'], vmin=0, vmax=1)
-
-    # https://pandas.pydata.org/docs/user_guide/style.html#Bar-charts
-    #s.bar(subset=['lsa_ratio_1', 'lsa_ratio_2'], align='left', color='#d65f5f', vmin=0, vmax=1)
 
 # Charts
 if True:
@@ -417,11 +441,9 @@ if True:
             st.metric(label="ISA",    value=f"£{result.ls_isa:,.0f}")
             st.metric(label="GIA",    value=f"£{result.ls_gia:,.0f}")
         with col2:
-            # https://altair-viz.github.io/gallery/pie_chart.html
             source = pd.DataFrame({"Asset": ["SIPP1", "SIPP2", "ISA", "GIA"], "Value": [
                 result.ls_sipp_1, result.ls_sipp_2, result.ls_isa, result.ls_gia
             ]})
-
             chart = alt.Chart(source).mark_arc().encode(
                 theta=alt.Theta(field="Value", type="quantitative"),
                 color=alt.Color(field="Asset", type="nominal"),
@@ -432,7 +454,6 @@ if True:
 
     cdf = pd.DataFrame()
 
-    # https://stackoverflow.com/questions/46658232/pandas-convert-column-with-year-integer-to-datetime
     cdf['Year'] = pd.to_datetime(df['year'], format='%Y')
 
     if st.session_state.joint:
@@ -440,22 +461,14 @@ if True:
         cdf['SIPP2'] = df['sipp_uf_2'] + df['sipp_df_2']
     else:
         cdf['SIPP '] = df['sipp_uf_1'] + df['sipp_df_1']
-cdf['ISA'] = df['isa']
+    cdf['ISA'] = df['isa']
 
-if 'gia' in df.columns:
-    cdf['GIA'] = df['gia']
+    if 'gia' in df.columns:
+        cdf['GIA'] = df['gia']
 
-    # https://altair-viz.github.io/user_guide/data.html#converting-with-pandas
     cdf = cdf.melt('Year', var_name='Asset', value_name='Value')
 
-    # https://altair-viz.github.io/user_guide/generated/core/altair.Legend.html
-    # https://stackoverflow.com/questions/68624885/position-altair-legend-top-center
-    legend = alt.Legend(
-        orient='top-right',
-        #legendX=130, legendY=-40,
-        #direction='horizontal',
-        #titleAnchor='middle'
-    )
+    legend = alt.Legend(orient='top-right')
 
     yScale = alt.Scale(domainMin=0)
     yAxis = alt.Axis(format=',.0f', title=None)
@@ -473,7 +486,6 @@ if 'gia' in df.columns:
 
     cdf = pd.DataFrame()
 
-    # https://stackoverflow.com/questions/46658232/pandas-convert-column-with-year-integer-to-datetime
     cdf['Year'] = pd.to_datetime(df['year'], format='%Y')
 
     if st.session_state.joint:
@@ -498,7 +510,7 @@ if 'gia' in df.columns:
 
 st.subheader("Plan")
 
-st.info("""- The _Personal Allowance_ and the _Higher Rate Threshold_ are progressivel been adjusted down until 2031, to reflect the fact that these thresholds [will remain the same in nominal terms](https://www.gov.uk/government/publications/budget-2025-document/budget-2025-html#taxation-of-income-from-assets#asking-everyone-to-contribute), therefore shrinking in _real_ terms.
+st.info("""- The _Personal Allowance_ and the _Higher Rate Threshold_ are progressively being adjusted down until 2031, to reflect the fact that these thresholds [will remain the same in nominal terms](https://www.gov.uk/government/publications/budget-2025-document/budget-2025-html#taxation-of-income-from-assets#asking-everyone-to-contribute), therefore shrinking in _real_ terms.
 - The ISA allowance is progressively adjusted down until 2030 to reflect the fact that [this limit will be frozen in nominal terms until 2030](https://www.gov.uk/government/publications/autumn-budget-2024/autumn-budget-2024-html#:~:text=Individual%20Savings%20Accounts%2C%20Lifetime%20ISA%2C%20Junior%20ISA%20and%20Child%20Trust%20Fund%20Allowance%20%E2%80%93%20Annual%20subscription%20limits%20will%20remain%20at%20%C2%A320%2C000%20for%20ISAs%2C%20%C2%A34%2C000%20for%20Lifetime%20ISAs%20and%20%C2%A39%2C000%20for%20Junior%20ISAs%20and%20Child%20Trust%20Funds%20until%205%20April%202030).
 """, icon="ℹ️")
 
@@ -507,7 +519,7 @@ with st.expander("Abbreviations..."):
 * **1**: You
 * **2**: Your partner
 * **A**: Annuities, including State Pension and Defined Benefit Pension Schemes.
-* **UF**: Uncrystalized Funds
+* **UF**: Uncrystallised Funds
 * **DF**: Drawdown Funds (for example, _flexi-access drawdown_)
 * **LSA**: [Lump Sum Allowance](https://www.gov.uk/tax-on-your-private-pension/lump-sum-allowance) (25% of the old LTA)
 * **GIA**: General Investment Account
@@ -517,6 +529,8 @@ with st.expander("Abbreviations..."):
 * **\u0394**: Cash flow, that is, cash going in or out of the pot; excluding internal growth.
 * **IT**: Income Tax
 * **CGT**: Capital Gains Tax
+* **Eq**: Equity sleeve
+* **ILG**: Index-Linked Gilt sleeve
 ''')
 
 # https://github.com/streamlit/streamlit/issues/4830#issuecomment-1147878371
