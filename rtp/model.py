@@ -85,6 +85,9 @@ class ResState:
     income_tax_rate_2: float
     cgt: float
     cgt_rate: float
+    iht_estate: float
+    iht: float
+    iht_rate: float
 
 
 @dataclasses.dataclass
@@ -393,6 +396,17 @@ class GIA:
 # GIAs to stabilize results, and prevent redundant money flows that
 # arise when the optimal solution is not unique
 eps = 2**-14
+
+
+def compute_iht(estate_value, nil_rate_band=325_000):
+    """Compute IHT payable at 40% on estate above the nil rate band.
+
+    For couples, pass nil_rate_band=650_000 to reflect the transferable NRB.
+    From April 2027, unused SIPP funds are included in the IHT estate
+    (Autumn Budget 2024).
+    """
+    taxable = max(0.0, estate_value - nil_rate_band)
+    return taxable * 0.40
 
 
 def solve(prob):
@@ -867,6 +881,15 @@ def model(
         tax_rate_2 = tax_2 / max(income_gross_2, 1)
         cgt_rate   = cgt   / max(cg, 1)
 
+        # IHT on death: SIPPs outside estate until April 2027, then included
+        # (Autumn Budget 2024). ISA and GIA always form part of the estate.
+        # For couples we use the transferable nil rate band (2 x £325k).
+        sipp_for_iht = (sipp_uf_1 + sipp_df_1 + sipp_uf_2 + sipp_df_2) if yr >= 2027 else 0.0
+        iht_estate   = sipp_for_iht + isa + gia
+        iht_nil_rate = 325_000 * N
+        iht          = compute_iht(iht_estate, nil_rate_band=iht_nil_rate)
+        iht_rate     = iht / max(iht_estate, 1.0)
+
         if verbosity > 0:
             print(' '.join((
                     '%4u:',
@@ -921,7 +944,10 @@ def model(
             income_tax_rate_1=tax_rate_1,
             income_tax_rate_2=tax_rate_2,
             cgt=cgt,
-            cgt_rate=cgt_rate
+            cgt_rate=cgt_rate,
+            iht_estate=normalize(iht_estate, 0),
+            iht=normalize(iht, 0),
+            iht_rate=iht_rate,
         )
 
         result.data.append(rs)
@@ -969,6 +995,9 @@ column_headers = {
     'income_tax_rate_2': '(%)',
     'cgt': 'CGT',
     'cgt_rate': '(%)',
+    'iht_estate': 'IHT Est',
+    'iht': 'IHT',
+    'iht_rate': '(%)',
 }
 
 
@@ -1002,6 +1031,7 @@ def run(params):
         'income_tax_rate_1': perc_format,
         'income_tax_rate_2': perc_format,
         'cgt_rate':     perc_format,
+        'iht_rate':     perc_format,
     }
 
     print(df.to_string(
@@ -1026,6 +1056,9 @@ def run(params):
 
     print(f"End net worth:         {result.net_worth_end:10,.0f}")
     print(f"Total tax:             {result.total_tax:10,.0f}")
+    final = result.data[-1]
+    print(f"IHT estate (end):      {final.iht_estate:10,.0f}")
+    print(f"IHT on death (end):    {final.iht:10,.0f}  ({final.iht_rate:.1%} of estate)")
 
     if result.ls_sipp_1 + result.ls_sipp_2 + result.ls_isa + result.ls_gia:
         print("Lump sump allocation:")
